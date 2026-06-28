@@ -66,6 +66,10 @@ def load_config(path: str = None) -> Dict[str, Any]:
     if env_nick:
         config["node"]["nickname"] = env_nick
 
+    env_api_host = os.environ.get("BITCHAT_API_HOST")
+    if env_api_host:
+        config["api"]["host"] = env_api_host
+
     env_bootstrap = os.environ.get("BITCHAT_BOOTSTRAP")
     if env_bootstrap:
         config["mesh"]["bootstrap_nodes"] = [s.strip() for s in env_bootstrap.split(",")]

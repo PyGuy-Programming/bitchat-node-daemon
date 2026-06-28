@@ -1,0 +1,37 @@
+services:
+  bitchat-node:
+    build: .
+    container_name: bitchat-node
+    restart: unless-stopped
+    ports:
+      # TCP peer port
+      - "8765:8765"
+      # REST + WebSocket API
+      - "8080:8080"
+    volumes:
+      # Persistent data (state, channel keys, …)
+      - bitchat-data:/var/lib/bitchat-node
+      # Optional: mount your own config.yaml
+      # - ./config.yaml:/etc/bitchat-node/config.yaml:ro
+    environment:
+      # All settings are optional – defaults come from config.yaml
+      - BITCHAT_PORT=8765
+      - BITCHAT_API_PORT=8080
+      - BITCHAT_API_HOST=0.0.0.0
+      - BITCHAT_NICKNAME=my-docker-node
+      # Comma-separated bootstrap peers
+      # - BITCHAT_BOOTSTRAP=node1.example.com:8765,node2.example.com:8765
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bitchat-data:

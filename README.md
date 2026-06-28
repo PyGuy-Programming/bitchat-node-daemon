@@ -22,10 +22,18 @@ This is a **TCP-based port** of the original [BitChat BLE client](https://github
 ### Install (one-liner)
 
 ```bash
-curl -sSfL https://raw.githubusercontent.com/PyGuy-Programming/bitchat-node-daemon/main/install.sh | sudo sh
+curl -sSfL https://raw.githubusercontent.com/PyGuy-Programming/bitchat-node-daemon/main/install.sh | sh
 ```
 
 This clones the repo to `/opt/bitchat-node`, installs dependencies, creates a `bitchat` system user, sets up a systemd service, and starts it.
+
+### Uninstall
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/PyGuy-Programming/bitchat-node-daemon/main/install.sh | sh -s uninstall
+```
+
+Stoppt und entfernt den Service, löscht Config, Daten und den System-User.
 
 ### Run manually
 
@@ -85,13 +93,43 @@ Connect to `ws://127.0.0.1:8080/ws` to receive real-time events:
 The daemon loads `config.yaml` by default. Environment variables override file settings:
 
 | Variable | Description |
-|---|---|
+|---|---|---|
 | `BITCHAT_PORT` | TCP peer port |
 | `BITCHAT_API_PORT` | REST/WS API port |
+| `BITCHAT_API_HOST` | API bind address (default `127.0.0.1`, use `0.0.0.0` für Docker) |
 | `BITCHAT_NICKNAME` | Node nickname |
 | `BITCHAT_BOOTSTRAP` | Comma-separated bootstrap peers (`host:port,host:port`) |
 
 See [`config.yaml`](./config.yaml) for the full default configuration.
+
+## Docker
+
+### Quick start
+
+```bash
+docker compose up -d
+```
+
+This builds the image and starts the daemon. Persistente Daten (state, channel keys) landen in einem named volume. Ports: `8765` (TCP peers), `8080` (REST + WebSocket).
+
+### Custom config
+
+```yaml
+# docker-compose.yml
+services:
+  bitchat-node:
+    # ...
+    volumes:
+      - ./my-config.yaml:/etc/bitchat-node/config.yaml:ro
+```
+
+Oder per Environment-Variablen:
+
+```yaml
+    environment:
+      - BITCHAT_NICKNAME=my-node
+      - BITCHAT_BOOTSTRAP=peer1.example.com:8765,peer2.example.com:8765
+```
 
 ## Project Structure
 
@@ -112,7 +150,9 @@ bitchat-node-daemon/
 │   ├── config.py         #   Config loader (YAML + env)
 │   └── __main__.py       #   Entry point
 ├── bitchat.py            # Original BLE client (still works)
-├── install.sh            # One-curl installer
+├── Dockerfile            # Docker image
+├── docker-compose.yml    # Docker Compose setup
+├── install.sh            # One-curl installer / uninstaller
 ├── config.yaml           # Default configuration
 └── pyproject.toml        # Python project metadata
 ```
