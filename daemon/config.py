@@ -80,6 +80,8 @@ def load_config(path: str = None) -> Dict[str, Any]:
 def _deep_merge(base: dict, overlay: dict):
     """Recursively merge overlay into base."""
     for key, value in overlay.items():
+        if value is None:
+            continue  # skip null values from YAML – keep the default
         if key in base and isinstance(base[key], dict) and isinstance(value, dict):
             _deep_merge(base[key], value)
         else:

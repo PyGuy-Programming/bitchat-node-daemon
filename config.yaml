@@ -7,9 +7,7 @@ node:
 
 mesh:
   # Initial peers to connect to on startup
-  bootstrap_nodes:
-    # - "node1.example.com:8765"
-    # - "node2.example.com:8765"
+  bootstrap_nodes: []  # e.g. ["node1.example.com:8765", "node2.example.com:8765"]
   max_peers: 50
   default_ttl: 7
 

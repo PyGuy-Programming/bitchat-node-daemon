@@ -26,7 +26,7 @@ class Discovery:
         self.config = config
         self._mdns_enabled = config.get("discovery", {}).get("mdns", True)
         self._mdns_service = config.get("discovery", {}).get("mdns_service", "_bitchat._tcp")
-        self._bootstrap_nodes: List[str] = config.get("mesh", {}).get("bootstrap_nodes", [])
+        self._bootstrap_nodes: List[str] = config.get("mesh", {}).get("bootstrap_nodes", []) or []
 
         self._known: Set[str] = set()  # "host:port" already discovered
         self._zeroconf = None
