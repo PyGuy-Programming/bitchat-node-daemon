@@ -1,0 +1,28 @@
+# BitChat Node Daemon Configuration
+node:
+  port: 8765
+  listen: "0.0.0.0"
+  nickname: "bitchat-node"
+  data_dir: "~/.bitchatxxk"
+
+mesh:
+  # Initial peers to connect to on startup
+  bootstrap_nodes:
+    # - "node1.example.com:8765"
+    # - "node2.example.com:8765"
+  max_peers: 50
+  default_ttl: 7
+
+discovery:
+  # mDNS/Zeroconf for automatic LAN discovery
+  mdns: true
+  mdns_service: "_bitchat._tcp"
+
+api:
+  host: "127.0.0.1"
+  rest_port: 8080
+  ws_port: 8080
+
+logging:
+  level: "INFO"    # DEBUG, INFO, WARNING, ERROR
+  # file: "/var/log/bitchat-node.log"
