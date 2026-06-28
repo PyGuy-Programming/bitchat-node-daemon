@@ -22,7 +22,7 @@ This is a **TCP-based port** of the original [BitChat BLE client](https://github
 ### Install (one-liner)
 
 ```bash
-curl -sSfL https://raw.githubusercontent.com/PyGuy-Programming/bitchat-node-daemon/main/install.sh | sh
+curl -sSfL https://raw.githubusercontent.com/PyGuy-Programming/bitchat-node-daemon/main/install.sh | sudo sh
 ```
 
 This clones the repo to `/opt/bitchat-node`, installs dependencies, creates a `bitchat` system user, sets up a systemd service, and starts it.
