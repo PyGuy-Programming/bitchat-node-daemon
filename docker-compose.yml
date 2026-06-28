@@ -1,6 +1,7 @@
 services:
   bitchat-node:
-    build: .
+    image: pyguyprogramming/bitchat-node-daemon:latest
+    # build: .   # uncomment to build locally instead of pulling from Docker Hub
     container_name: bitchat-node
     restart: unless-stopped
     ports:

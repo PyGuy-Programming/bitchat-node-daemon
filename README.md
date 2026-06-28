@@ -110,7 +110,14 @@ See [`config.yaml`](./config.yaml) for the full default configuration.
 docker compose up -d
 ```
 
-This builds the image and starts the daemon. Persistente Daten (state, channel keys) landen in einem named volume. Ports: `8765` (TCP peers), `8080` (REST + WebSocket).
+Zieht das Image von Docker Hub und startet den Daemon. Persistente Daten (state, channel keys) landen in einem named volume. Ports: `8765` (TCP peers), `8080` (REST + WebSocket).
+
+Lokal bauen (z.B. nach Code-Änderungen):
+
+```bash
+docker compose build
+docker compose up -d
+```
 
 ### Custom config
 
