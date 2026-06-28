@@ -18,8 +18,7 @@ from .config import load_config
 from .transport import Transport
 from .mesh import MeshNode
 from .discovery import Discovery
-from .api import RestApi
-from .ws import WsServer
+from .api import HttpServer
 
 log = logging.getLogger("daemon")
 
@@ -44,8 +43,7 @@ class Daemon:
         self.transport = Transport()
         self.mesh = MeshNode(self.transport, config)
         self.discovery = Discovery(config)
-        self.api = RestApi(self.mesh, config)
-        self.ws = WsServer(self.mesh, config)
+        self.api = HttpServer(self.mesh, config)
         self._running = False
 
     async def start(self):
@@ -66,19 +64,13 @@ class Daemon:
         # 3. Start discovery
         await self.discovery.start()
 
-        # 4. Send initial identity on new transport connections
-        original_on_connected = self.transport.on_connected
-        async def on_connected_wrapper(conn):
-            if original_on_connected:
-                original_on_connected(conn)
+        # 4. On new transport connections, send our identity
+        async def _on_connected(conn):
             await self.mesh.on_connect_transport(conn.host, conn.port)
-        self.transport.on_connected = on_connected_wrapper
+        self.transport.on_connected = _on_connected
 
-        # 5. Start API
+        # 5. Start HTTP server (REST + WebSocket)
         await self.api.start()
-
-        # 6. Start WebSocket (shares port with API)
-        await self.ws.start()
 
         log.info("Daemon started (peer_id=%s, nickname=%s)",
                  self.mesh.my_peer_id[:8], self.mesh.nickname)
@@ -89,7 +81,6 @@ class Daemon:
 
         await self.mesh.send_leave()
 
-        await self.ws.stop()
         await self.api.stop()
         await self.discovery.stop()
         await self.mesh.save_state()

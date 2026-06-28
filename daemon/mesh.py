@@ -58,9 +58,13 @@ class MeshNode:
 
         # Identity & state
         self.my_peer_id = os.urandom(8).hex()
-        self.nickname = config.get("nickname", "anon-daemon")
+        self.nickname = config.get("node", {}).get("nickname", "anon-daemon")
         self.app_state = load_state()
-        if self.app_state.nickname:
+        # CLI --nickname takes precedence over saved state
+        cli_nickname = config.get("node", {}).get("nickname")
+        if cli_nickname:
+            self.nickname = cli_nickname
+        elif self.app_state.nickname:
             self.nickname = self.app_state.nickname
 
         # Encryption
@@ -750,9 +754,13 @@ class MeshNode:
     # ------------------------------------------------------------------
 
     async def on_connect_transport(self, host: str, port: int):
-        """Called when Transport connects to a new peer. Send identity."""
+        """Called when Transport connects to a new peer. Send identity.
+        
+        Waits a short moment for the TCP connection to stabilize,
+        then sends identity announce and a basic nickname announce.
+        """
         try:
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.3)
             await self.send_identity_announce()
             await asyncio.sleep(0.3)
             await self.send_announce()

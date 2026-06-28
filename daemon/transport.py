@@ -57,10 +57,11 @@ class Transport:
         self._connections: Dict[str, PeerConnection] = {}  # address -> connection
         self._pending: Dict[str, asyncio.Future] = {}  # address -> future (for reconnect tracking)
 
-        # Callbacks – set by the mesh layer
-        self.on_packet: Optional[Callable[[PeerConnection, bytes], None]] = None
-        self.on_connected: Optional[Callable[[PeerConnection], None]] = None
-        self.on_disconnected: Optional[Callable[[PeerConnection], None]] = None
+        # Callbacks – set by the mesh layer.
+        # Can be either sync or async (coroutine) functions.
+        self.on_packet: Optional[Callable] = None
+        self.on_connected: Optional[Callable] = None
+        self.on_disconnected: Optional[Callable] = None
 
     # ------------------------------------------------------------------
     # Server
@@ -100,16 +101,14 @@ class Transport:
         log.info("Incoming connection from %s", addr)
 
         try:
-            if self.on_connected:
-                self.on_connected(conn)
+            self._fire(self.on_connected, conn)
             await self._read_loop(conn)
         except (ConnectionError, asyncio.IncompleteReadError, OSError):
             pass
         finally:
             self._connections.pop(addr, None)
             conn.close()
-            if self.on_disconnected:
-                self.on_disconnected(conn)
+            self._fire(self.on_disconnected, conn)
             log.info("Connection closed: %s", addr)
 
     # ------------------------------------------------------------------
@@ -146,8 +145,7 @@ class Transport:
         log.info("Connected to %s", addr)
 
         # Fire connected callback and start reading
-        if self.on_connected:
-            self.on_connected(conn)
+        self._fire(self.on_connected, conn)
 
         # Start reading in background
         task = asyncio.create_task(self._read_loop(conn))
@@ -161,16 +159,14 @@ class Transport:
         if conn:
             conn.close()
             log.info("Disconnected from %s", addr)
-            if self.on_disconnected:
-                self.on_disconnected(conn)
+        self._fire(self.on_disconnected, conn)
 
     def _on_read_done(self, conn: PeerConnection):
         """Called when the read loop finishes (connection lost)."""
         if conn.address in self._connections:
             del self._connections[conn.address]
         conn.close()
-        if self.on_disconnected:
-            self.on_disconnected(conn)
+        self._fire(self.on_disconnected, conn)
 
     # ------------------------------------------------------------------
     # Send / Receive
@@ -210,8 +206,13 @@ class Transport:
     async def _read_loop(self, conn: PeerConnection):
         """Read framed packets from a peer connection indefinitely."""
         while True:
-            # Read 2-byte length header
-            header = await conn.reader.readexactly(2)
+            try:
+                # Read 2-byte length header
+                header = await conn.reader.readexactly(2)
+            except asyncio.IncompleteReadError:
+                # Connection closed gracefully – nothing to read
+                break
+
             payload_len = struct.unpack(">H", header)[0]
 
             if payload_len > MAX_PACKET_SIZE:
@@ -219,10 +220,25 @@ class Transport:
                 break
 
             # Read the raw packet bytes
-            raw = await conn.reader.readexactly(payload_len)
+            try:
+                raw = await conn.reader.readexactly(payload_len)
+            except asyncio.IncompleteReadError:
+                log.warning("Incomplete packet from %s (expected %d bytes)", conn.address, payload_len)
+                break
 
-            if self.on_packet:
-                self.on_packet(conn, raw)
+            self._fire(self.on_packet, conn, raw)
+
+    # ------------------------------------------------------------------
+    # Callback helper
+    # ------------------------------------------------------------------
+
+    def _fire(self, callback: Optional[Callable], *args, **kwargs):
+        """Invoke a callback, whether it is a sync function or a coroutine."""
+        if callback is None:
+            return
+        result = callback(*args, **kwargs)
+        if asyncio.iscoroutine(result):
+            asyncio.create_task(result)
 
     # ------------------------------------------------------------------
     # Utility

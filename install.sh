@@ -14,7 +14,7 @@
 
 set -e
 
-REPO_URL="https://github.com/luca/bitchat-node-daemon.git"
+REPO_URL="https://github.com/PyGuy-Programming/bitchat-node-daemon.git"
 INSTALL_DIR="${INSTALL_DIR:-/opt/bitchat-node}"
 SERVICE_USER="${SERVICE_USER:-bitchat}"
 PYTHON="${PYTHON:-python3}"
@@ -148,7 +148,7 @@ info "Creating systemd service..."
 cat > "$SERVICE_FILE" <<SERVICEEOF
 [Unit]
 Description=BitChat Node Daemon
-Documentation=https://github.com/luca/bitchat-node-daemon
+Documentation=${REPO_URL%.git}
 After=network.target
 
 [Service]
