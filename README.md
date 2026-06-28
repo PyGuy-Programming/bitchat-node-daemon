@@ -7,15 +7,15 @@ This is a **TCP-based port** of the original [BitChat BLE client](https://github
 ## Features
 
 - **P2P Mesh** – nodes discover each other and relay messages with TTL-based flooding
+- **P2P Mesh** – nodes discover each other and relay messages with TTL-based flooding
 - **End-to-End Encryption** – Noise Protocol (XX handshake + ChaCha20-Poly1305) for private messages
-- **Channel Encryption** – password-protected channels with key derivation and commitment verification
-- **Message Relaying** – every node acts as a relay, spreading messages across the network
+- **Message Relaying** – every node acts as a relay, spreading encrypted messages across the network
 - **Fragment Reassembly** – large messages are fragmented and reassembled automatically
-- **REST API** – control the node via HTTP (`/status`, `/message`, `/connect`, etc.)
-- **WebSocket Stream** – real-time events (`message`, `peer_joined`, `peer_left`, `ack`)
+- **REST API** – operational control only (`/status`, `/peers`, `/connect`, …) – **no message content exposed**
+- **WebSocket Stream** – real-time operational events (`peer_joined`, `peer_left`, `ack`) – **no message content**
 - **mDNS Discovery** – automatically finds peers on the local network
-- **Persistence** – state, channel keys, and blocked peers survive restarts
-- **systemd Integration** – install as a background service with the provided installer
+- **Persistence** – state and peer data survive restarts
+- **systemd / Docker** – install as a background service or run in a container
 
 ## Quick Start
 
@@ -71,22 +71,21 @@ The daemon exposes a REST API on `http://127.0.0.1:8080` by default.
 | `GET` | `/peers` | List connected peers |
 | `POST` | `/connect` | Connect to a peer `{"host": "...", "port": 8765}` |
 | `POST` | `/disconnect` | Disconnect from a peer `{"address": "host:port"}` |
-| `POST` | `/message` | Send a message `{"content": "...", "private": false, "channel": "#general"}` |
-| `GET` | `/channels` | List discovered channels |
-| `POST` | `/channels/join` | Join a channel `{"channel": "#general", "password": "..."}` |
-| `POST` | `/channels/leave` | Leave a channel `{"channel": "#general"}` |
 | `PUT` | `/name` | Change nickname `{"nickname": "alice"}` |
+
+> **Note:** The daemon is a headless relay and intentionally exposes **no message content** via the API. Endpoints for sending messages, listing channels, or joining/leaving channels are omitted.
 
 ### WebSocket
 
-Connect to `ws://127.0.0.1:8080/ws` to receive real-time events:
+Connect to `ws://127.0.0.1:8080/ws` to receive real-time operational events:
 
 ```json
-{"event": "message", "data": {"id": "...", "content": "hello", "channel": null, "is_private": true, "sender_id": "...", "sender_nickname": "bob"}}
 {"event": "peer_joined", "data": {"peer_id": "...", "nickname": "bob"}}
 {"event": "peer_left", "data": {"peer_id": "...", "nickname": "bob"}}
 {"event": "ack", "data": {"original_message_id": "...", "recipient_id": "...", "recipient_nickname": "bob"}}
 ```
+
+> **No message content** is broadcast via WebSocket. Only peer lifecycle and delivery acknowledgments are forwarded.
 
 ## Configuration
 
@@ -110,7 +109,7 @@ See [`config.yaml`](./config.yaml) for the full default configuration.
 docker compose up -d
 ```
 
-Zieht das Image von Docker Hub und startet den Daemon. Persistente Daten (state, channel keys) landen in einem named volume. Ports: `8765` (TCP peers), `8080` (REST + WebSocket).
+Zieht das Image von Docker Hub und startet den Daemon als Headless-Relay. Persistente Daten landen in einem named volume. Ports: `8765` (TCP peers), `8080` (REST + WebSocket – nur operational, keine Nachrichteninhalte).
 
 Lokal bauen (z.B. nach Code-Änderungen):
 

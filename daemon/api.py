@@ -11,7 +11,7 @@ from typing import Optional, Set
 
 from aiohttp import web
 
-from bitchat.protocol import BitchatMessage, DeliveryAck
+from bitchat.protocol import DeliveryAck
 
 from .mesh import MeshNode
 
@@ -35,7 +35,8 @@ class HttpServer:
         self._ws_clients: Set[web.WebSocketResponse] = set()
 
         # Wire mesh callbacks -> WebSocket broadcast
-        self.mesh.on_message = self._on_message
+        # NOTE: on_message is intentionally NOT wired – the daemon is a headless relay
+        # and must not expose message contents via API.
         self.mesh.on_peer_joined = self._on_peer_joined
         self.mesh.on_peer_left = self._on_peer_left
         self.mesh.on_delivery_ack = self._on_ack
@@ -51,10 +52,7 @@ class HttpServer:
         self._app.router.add_get("/peers", self._handle_peers)
         self._app.router.add_post("/connect", self._handle_connect)
         self._app.router.add_post("/disconnect", self._handle_disconnect)
-        self._app.router.add_post("/message", self._handle_send_message)
-        self._app.router.add_get("/channels", self._handle_channels)
-        self._app.router.add_post("/channels/join", self._handle_join_channel)
-        self._app.router.add_post("/channels/leave", self._handle_leave_channel)
+        # NOTE: /message, /channels are intentionally omitted – headless relay
         self._app.router.add_put("/name", self._handle_set_name)
 
         # WebSocket
@@ -129,89 +127,6 @@ class HttpServer:
         await self.mesh.transport.disconnect(addr)
         return web.json_response({"status": "disconnected"})
 
-    async def _handle_send_message(self, request):
-        try:
-            data = await request.json()
-        except Exception:
-            return web.json_response({"error": "invalid JSON"}, status=400)
-
-        content = data.get("content", "").strip()
-        if not content:
-            return web.json_response({"error": "content required"}, status=400)
-
-        target = data.get("target")
-        is_private = data.get("private", False)
-        channel = data.get("channel")
-
-        try:
-            if is_private and target:
-                peer = self.mesh.peers.get(target)
-                nickname = peer.nickname if peer else target
-                msg_id = await self.mesh.send_private_message(content, target, nickname)
-            elif channel:
-                msg_id = await self.mesh.send_public_message(content, channel)
-            else:
-                msg_id = await self.mesh.send_public_message(content)
-
-            return web.json_response({"status": "sent", "message_id": msg_id})
-        except Exception as e:
-            return web.json_response({"error": str(e)}, status=500)
-
-    async def _handle_channels(self, request):
-        channels = []
-        for ch in sorted(self.mesh.discovered_channels):
-            channels.append({
-                "name": ch,
-                "protected": ch in self.mesh.password_protected_channels,
-                "has_key": ch in self.mesh.channel_keys,
-                "creator": self.mesh.channel_creators.get(ch, ""),
-            })
-        return web.json_response(channels)
-
-    async def _handle_join_channel(self, request):
-        try:
-            data = await request.json()
-        except Exception:
-            return web.json_response({"error": "invalid JSON"}, status=400)
-
-        channel = data.get("channel", "").strip()
-        password = data.get("password")
-
-        if not channel:
-            return web.json_response({"error": "channel required"}, status=400)
-
-        if channel in self.mesh.password_protected_channels:
-            if not password:
-                return web.json_response({"error": "password required"}, status=400)
-            if channel in self.mesh.channel_key_commitments:
-                from bitchat.encryption import EncryptionService
-                import hashlib
-                key = EncryptionService.derive_channel_key(password, channel)
-                expected = self.mesh.channel_key_commitments[channel]
-                if hashlib.sha256(key).hexdigest() != expected:
-                    return web.json_response({"error": "wrong password"}, status=403)
-                self.mesh.channel_keys[channel] = key
-
-        self.mesh.discovered_channels.add(channel)
-        return web.json_response({"status": "joined", "channel": channel})
-
-    async def _handle_leave_channel(self, request):
-        try:
-            data = await request.json()
-        except Exception:
-            return web.json_response({"error": "invalid JSON"}, status=400)
-
-        channel = data.get("channel", "").strip()
-        if not channel:
-            return web.json_response({"error": "channel required"}, status=400)
-
-        self.mesh.channel_keys.pop(channel, None)
-        self.mesh.password_protected_channels.discard(channel)
-        self.mesh.channel_creators.pop(channel, None)
-        self.mesh.channel_key_commitments.pop(channel, None)
-        self.mesh.discovered_channels.discard(channel)
-        return web.json_response({"status": "left", "channel": channel})
-
     async def _handle_set_name(self, request):
         try:
             data = await request.json()
@@ -269,22 +184,6 @@ class HttpServer:
     # ------------------------------------------------------------------
     # Mesh callbacks -> WS broadcast
     # ------------------------------------------------------------------
-
-    def _on_message(self, message: BitchatMessage, sender_id: str, is_private: bool, sender_str: str):
-        peer = self.mesh.peers.get(sender_id)
-        nickname = peer.nickname if peer else sender_id[:8]
-        asyncio.create_task(self._broadcast({
-            "event": "message",
-            "data": {
-                "id": message.id,
-                "content": message.content,
-                "channel": message.channel,
-                "is_encrypted": message.is_encrypted,
-                "is_private": is_private,
-                "sender_id": sender_id,
-                "sender_nickname": nickname,
-            }
-        }))
 
     def _on_peer_joined(self, peer_id: str, nickname: str):
         asyncio.create_task(self._broadcast({
